@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# md_lite
 
-## Getting Started
+A lightweight Markdown editor and sharing app. Approved users create, edit, and
+share Markdown documents with a live preview and automatic saving. Documents can
+be public (readable by anyone with the link) or private (readable only by the
+owner and explicit collaborators).
 
-First, run the development server:
+The frontend talks directly to Supabase — there is no custom backend. All
+authorization is enforced in the database through Row Level Security, so the
+anon client can never read or write data the signed-in user is not allowed to.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+- Next.js (App Router) + TypeScript
+- Tailwind CSS
+- CodeMirror 6 for Markdown editing
+- react-markdown + remark-gfm + rehype-sanitize for the sanitized preview
+- Supabase Auth, PostgreSQL, and Row Level Security
+
+## Getting started
+
+### 1. Create a Supabase project
+
+In the [Supabase dashboard](https://supabase.com/dashboard), create a new
+project and open the SQL Editor.
+
+### 2. Apply the schema
+
+Run [`supabase/schema.sql`](supabase/schema.sql) in the SQL Editor. It creates
+the tables, indexes, permission helper functions, protective triggers, and the
+full set of RLS policies.
+
+### 3. Configure environment variables
+
+Copy `.env.example` to `.env.local` and fill in the values from your Supabase
+project (Project Settings → API):
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_ENABLE_SIGNUP=true
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Never put the service role key in the frontend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Run the app
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+The app runs at http://localhost:3000.
 
-To learn more about Next.js, take a look at the following resources:
+## User approval
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Signing up creates an account and a profile, but does **not** grant write
+access. Approval is manual: a new user can only read public documents until an
+administrator approves them.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+To approve a user, copy their id from Supabase (Authentication → Users) and run
+[`supabase/approve_user.sql`](supabase/approve_user.sql) with that id, or insert
+directly:
 
-## Deploy on Vercel
+```sql
+insert into public.app_members (user_id, role)
+values ('AUTH_USER_ID', 'writer');
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Once approved, the user can create documents, own them, and be added as a
+collaborator.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Access model
+
+| Level                  | Read | Edit title/content | Visibility | Collaborators | Delete |
+| ---------------------- | ---- | ------------------ | ---------- | ------------- | ------ |
+| Anonymous (public doc) | yes  | no                 | no         | no            | no     |
+| Read collaborator      | yes  | no                 | no         | no            | no     |
+| Write collaborator     | yes  | yes                | no         | no            | no     |
+| Owner                  | yes  | yes                | yes        | yes           | yes    |
+
+## Deployment
+
+Deploy to Vercel, add the same `NEXT_PUBLIC_*` environment variables, and set the
+Supabase Auth site URL and redirect URLs to your deployed domain. Then create an
+owner account in production and approve it by inserting its id into
+`app_members`.

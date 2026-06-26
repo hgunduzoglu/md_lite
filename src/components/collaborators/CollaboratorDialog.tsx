@@ -28,8 +28,17 @@ export default function CollaboratorDialog({
   }, [documentId]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let active = true;
+    listDocumentCollaborators(documentId).then((rows) => {
+      if (active) {
+        setCollaborators(rows);
+        setLoading(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [documentId]);
 
   return (
     <div
