@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
 
@@ -19,6 +19,10 @@ export default function SplitEditor({
   editable: boolean;
 }) {
   const [mobileView, setMobileView] = useState<MobileView>('write');
+
+  // Keep typing responsive: the editor uses the live value, while the preview
+  // renders from a deferred copy so re-parsing the Markdown never blocks input.
+  const previewValue = useDeferredValue(value);
 
   return (
     <div className="flex h-full flex-col">
@@ -53,7 +57,7 @@ export default function SplitEditor({
             mobileView === 'preview' ? 'block' : 'hidden'
           }`}
         >
-          <MarkdownPreview content={value} />
+          <MarkdownPreview content={previewValue} />
         </div>
       </div>
     </div>
