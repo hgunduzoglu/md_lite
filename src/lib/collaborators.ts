@@ -1,9 +1,35 @@
 import { supabase } from './supabase';
+import { getCurrentUser } from './auth';
 import type {
   CollaboratorPermission,
   CollaboratorWithProfile,
   DocumentCollaborator,
 } from '@/types/collaborator';
+
+// Returns the current user's collaborator permission on a document, or null if
+// they are not a collaborator. RLS lets a user read their own collaborator
+// rows, so this works without owning the document.
+export async function getMyCollaboratorPermission(
+  documentId: string
+): Promise<CollaboratorPermission | null> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('document_collaborators')
+    .select('permission')
+    .eq('document_id', documentId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as { permission: CollaboratorPermission } | null)?.permission ?? null;
+}
 
 // Lists collaborators for a document the current user owns, joined with each
 // collaborator's profile so the UI can show email and display name.
